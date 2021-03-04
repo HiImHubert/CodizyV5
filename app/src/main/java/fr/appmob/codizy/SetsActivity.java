@@ -23,7 +23,7 @@ public class SetsActivity extends AppCompatActivity {
 
     private GridView setsGrid;
     private FirebaseFirestore firestore;
-    private int categoryId;
+    public static int categoryId;
     private Dialog loadingDialog;
 
     @Override
@@ -55,7 +55,6 @@ public class SetsActivity extends AppCompatActivity {
                 .get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
             @Override
             public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-
                 if (task.isSuccessful()) {
                     DocumentSnapshot doc = task.getResult();
 

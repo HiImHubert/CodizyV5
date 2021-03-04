@@ -1,8 +1,10 @@
 package fr.appmob.codizy;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.animation.Animator;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -10,12 +12,23 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static fr.appmob.codizy.SetsActivity.categoryId;
 
 public class QuestionActivity extends AppCompatActivity implements View.OnClickListener{
 
@@ -24,6 +37,9 @@ public class QuestionActivity extends AppCompatActivity implements View.OnClickL
     private List<Question> questionList;
     private int questionNum, score;
     private CountDownTimer countDown;
+    private FirebaseFirestore firestore;
+    private int setNumber;
+    private Dialog loadingDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,7 +49,6 @@ public class QuestionActivity extends AppCompatActivity implements View.OnClickL
         question = findViewById(R.id.question);
         qCount = findViewById(R.id.question_number);
         timer = findViewById(R.id.countdown);
-
         opt1 = findViewById(R.id.option1);
         opt2 = findViewById(R.id.option2);
         opt3 = findViewById(R.id.option3);
@@ -44,19 +59,46 @@ public class QuestionActivity extends AppCompatActivity implements View.OnClickL
         opt3.setOnClickListener(this);
         opt4.setOnClickListener(this);
 
+        loadingDialog = new Dialog(QuestionActivity.this);
+        loadingDialog.setContentView(R.layout.loading_progressbar);
+        loadingDialog.setCancelable(false);
+        loadingDialog.getWindow().setBackgroundDrawableResource(R.drawable.progress_background);
+        loadingDialog.getWindow().setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        loadingDialog.show();
+
+        setNumber = getIntent().getIntExtra("SETNO", 1);
+        firestore = FirebaseFirestore.getInstance();
+
         getQuestionList();
         score = 0;
     }
 
     private void getQuestionList(){
         questionList = new ArrayList<>();
-        questionList.add(new Question("Question 1", "A", "B", "C", "D", 2));
-        questionList.add(new Question("Question 2", "B", "B", "D", "A", 2));
-        questionList.add(new Question("Question 3", "C", "B", "A", "D", 2));
-        questionList.add(new Question("Question 4", "A", "D", "C", "B", 2));
-        questionList.add(new Question("Question 5", "C", "D", "A", "D", 2));
+        firestore.collection("QUIZ").document("CAT" + String.valueOf(categoryId))
+                .collection("SET" + String.valueOf(setNumber))
+                .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                if (task.isSuccessful()) {
+                    QuerySnapshot questions = task.getResult();
 
-        setQuestion();
+                    for(QueryDocumentSnapshot doc : questions){
+                        questionList.add(new Question(doc.getString("QUESTION"),
+                                doc.getString("A"),
+                                doc.getString("B"),
+                                doc.getString("C"),
+                                doc.getString("D"),
+                                Integer.valueOf(doc.getString("ANSWER"))
+                                ));
+                    }
+                    setQuestion();
+                } else {
+                    Toast.makeText(QuestionActivity.this, task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                }
+                loadingDialog.cancel();
+            }
+        });
     }
 
     private void setQuestion() {
@@ -67,7 +109,6 @@ public class QuestionActivity extends AppCompatActivity implements View.OnClickL
         opt2.setText(questionList.get(0).getOpt2());
         opt3.setText(questionList.get(0).getOpt3());
         opt4.setText(questionList.get(0).getOpt4());
-
         qCount.setText(String.valueOf(1) + "/" + String.valueOf(questionList.size()));
 
         startTimer();
@@ -109,7 +150,6 @@ public class QuestionActivity extends AppCompatActivity implements View.OnClickL
             intent.putExtra("SCORE", String.valueOf(score) + "/" + String.valueOf(questionList.size()));
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
-            //QuestionActivity.this.finish();
         }
     }
 
